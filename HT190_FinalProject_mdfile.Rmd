@@ -59,7 +59,7 @@ generate_surv_time <- function(hazard_ratio) {
   -log(1 - runif(1)) / (baseline_hazard * hazard_ratio) + rnorm(1,0,10)
 }
 
-#generate outcomes
+#generate outcomes. N.B.: for simplicity of calculations and assuming good study retention, we assume no loss to follow-up
 B_s<-log(0.75)
 B_m<-log(1.25)
 for (i in 1:nval) {
