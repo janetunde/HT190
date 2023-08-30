@@ -1,0 +1,132 @@
+---
+title: "HT Final Project: Mock Data & Analysis"
+output: html_document
+date: "30 August 2023"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+```{r}
+library(survival)
+library(dplyr)
+```
+## Simulation
+```{r}
+set.seed(1310)
+
+#Monte Carlo Modeling to Determine n AND generation of simulated results
+
+#study size
+n <- c(200)
+pow<-numeric(length(n))
+
+#number of iterations for simulation
+iter<-1
+results<-numeric(iter)
+
+#loop through the n's
+for (j in 1:length(n)){
+  nval<- n[j]
+  #start the counter
+  success<-0
+  #loop through the iterations for each n
+  for (i in 1:iter){
+  #assign explanatory variables
+  m1<- sample(0:5, nval, replace = TRUE)
+  m2 <- sample(0:5, nval, replace = TRUE)
+  m3 <- sample(0:5, nval, replace = TRUE)
+  m4 <- sample(0:5, nval, replace = TRUE)
+  m5 <- sample(0:5, nval, replace = TRUE)
+  m6 <- sample(0:5, nval, replace = TRUE)
+  m7 <- sample(0:5, nval, replace = TRUE)
+  m8 <- sample(0:5, nval, replace = TRUE)
+  #spaceholds for other variables
+  Time<-integer(nval)
+  Hazard_Ratio<-integer(nval)
+  Outcome<-integer(nval)
+  
+#compile it in a data frame
+data <- data.frame(m1, m2, m3, m4, m5, m6, m7, m8)
+
+#baseline hazard rate selected to achieve realistic ~30% NSLC survival at 5 years = 260 weeks
+baseline_hazard <- 0.2
+
+#function to predict survival time ~ hazard rate, with some noise
+generate_surv_time <- function(hazard_ratio) {
+  -log(1 - runif(1)) / (baseline_hazard * hazard_ratio) + rnorm(1,0,10)
+}
+
+#generate outcomes
+B_s<-log(0.75)
+B_m<-log(1.25)
+for (i in 1:nval) {
+  Hazard_Ratio[i] <- exp(1.1*B_s * data$m1[i] + 1.5*B_s * data$m2[i] + B_s * data$m3[i] + .95*B_s* data$m4[i] + .9*B_s * data$m5[i] + B_m * data$m6[i] + 0.9*B_m * data$m7[i] + 1.4*B_m * data$m8[i])
+  
+  Time[i] <- generate_surv_time(Hazard_Ratio[i])
+  
+  #reassign Time[i] = 260 and Outcome[i] = 0 if Time[i] >= 260, right censoring
+  if (Time[i] >= 260) {
+    Time[i] <- 260
+    Outcome[i] <- 0
+  } else {
+    Outcome[i] <- ifelse(runif(1) < 1 - exp(-baseline_hazard * Hazard_Ratio[i] * Time[i]), 1, 0)
+  }
+}
+
+data <- cbind(data, Time, Outcome)
+  
+  #fit Cox PH model to mock data
+  cox_model <- coxph(Surv(Time, Outcome) ~ m1 + m2 + m3 + m4 + m5 + m6 + m7 + m8, data = data)
+  
+  #apply LRT to mock data
+  anova1<-anova(cox_model,coxph(Surv(Time, Outcome) ~ m2 + m3 + m4 + m5 + m6 + m7 + m8, data = data))
+  anova2<-anova(cox_model,coxph(Surv(Time, Outcome) ~ m1 + m3 + m4 + m5 + m6 + m7 + m8, data = data))
+  anova3<-anova(cox_model, coxph(Surv(Time, Outcome) ~ m1 + m2 + m4 + m5 + m6 + m7 + m8, data = data))
+  anova4<-anova(cox_model, coxph(Surv(Time, Outcome) ~ m1 + m2 + m3 + m5 + m6 + m7 + m8, data = data))
+  anova5<-anova(cox_model,coxph(Surv(Time, Outcome) ~ m1 + m2 + m3 + m4 + m6 + m7 + m8, data = data))
+  anova6<-anova(cox_model, coxph(Surv(Time, Outcome) ~ m1 + m2 + m3 + m4 + m5 + m7 + m8, data = data))
+  anova7<-anova(cox_model,coxph(Surv(Time, Outcome) ~ m1 + m2 + m3 + m4 + m5 + m6 + m8, data = data))
+  anova8<-anova(cox_model,coxph(Surv(Time, Outcome) ~ m1 + m2 + m3 + m4 + m5 + m6 + m7, data = data))
+
+  #condition for success
+  if((anova1$`Pr(>|Chi|)`[2]<0.05/8) && (anova2$`Pr(>|Chi|)`[2]<0.05/8) && (anova3$`Pr(>|Chi|)`[2]<0.05/8) && (anova4$`Pr(>|Chi|)`[2]<0.05/8) && (anova5$`Pr(>|Chi|)`[2]<0.05/8) && (anova6$`Pr(>|Chi|)`[2]<0.05/8) && (anova7$`Pr(>|Chi|)`[2]<0.05/8)  && (anova8$`Pr(>|Chi|)`[2]<0.05/8)){
+    success<-success+1
+  }else {
+    success<-success
+  }
+  }
+  
+  #print power for each n
+  pow[j]<-success/iter
+  cat("Sample size =", nval,": Power = ", success/iter, "\n")
+}
+```
+## Results
+```{r}
+#plot power analysis results
+plot(n,pow,"b", col = "blue",main = "Power Analysis", xlab = "Sample Size [n]", ylab = "Power")
+```
+
+```{r}
+#plot the Kaplan-Meier survival curve
+survival_data <- Surv(time = data$Time, event = data$Outcome)
+
+km_fit <- survfit(survival_data ~ 1)
+
+plot(km_fit, xlab = "Time [Weeks]",ylab = "Survival Probability",main = "Kaplan-Meier Survival Curve with 95% CI")
+
+#plot the Schoenfeld Residuals
+temp <- cox.zph(cox_model)
+schoenfeld<-plot(temp, xlab = "Time [Weeks]", ylab = "Coefficient")
+schoenfeld
+
+#test correlation with time using built-in function
+test.ph <- cox.zph(cox_model)
+test.ph
+
+#review results of the cox model, reference ANOVA values in environment for significance
+summary(cox_model)
+```
