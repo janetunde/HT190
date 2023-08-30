@@ -34,7 +34,7 @@ for (j in 1:length(n)){
   success<-0
   #loop through the iterations for each n
   for (i in 1:iter){
-  #assign explanatory variables
+  #assign explanatory variables (Standard, Neighborhood, Working, Social, Healthcare, Risk, Age, Stage).
   m1<- sample(0:5, nval, replace = TRUE)
   m2 <- sample(0:5, nval, replace = TRUE)
   m3 <- sample(0:5, nval, replace = TRUE)
